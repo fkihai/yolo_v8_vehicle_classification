@@ -1,7 +1,3 @@
-Berikut adalah struktur **README.md** yang cocok untuk proyek Anda dengan format yang rapi dan informatif:
-
----
-
 # 🚢 Ferry Vehicle Detection and Classification with YOLOv8
 
 This project utilizes **YOLOv8m** from the **Ultralytics** library to detect and classify vehicles for ticketing purposes on ferry transportation. It identifies vehicle types such as cars, trucks, buses, and motorcycles from the **COCO dataset**.
