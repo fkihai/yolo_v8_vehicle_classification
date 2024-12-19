@@ -2,26 +2,15 @@ import os
 from ultralytics import YOLO
 import cv2
 import time
-import mysql.connector
-
-#  DATABASE
-mydb = mysql.connector.connect(
-  host="localhost",
-  user="root",
-  password="",
-  database = "kelas_kendaraan"
-)
-mycursor = mydb.cursor()
 
 VIDEOS_DIR = os.path.join('.', 'videos')
-video_path = os.path.join(VIDEOS_DIR, 'truck-test.mp4')
+video_path = os.path.join(VIDEOS_DIR, 'car-video.mp4')
 
 cap = cv2.VideoCapture(video_path)
 ret, frame = cap.read()
 H, W, _ = frame.shape
 
-# model_path = os.path.join('.', 'runs', 'detect', 'train8', 'weights', 'best.pt')
-model_path = os.path.join('.', 'model/yolov8n.pt')
+model_path = os.path.join('.', 'yolov8m.pt')
 
 # Load the model
 model = YOLO(model_path)  # Load a custom YOLO model
@@ -31,14 +20,13 @@ threshold = 0.50
 width = 1280   # Lebar frame 
 height = 720   # Tinggi frame 
 
-
 # Gambar Kotak Merah
 x1_frame, y1_frame = 50, 250  # Pojok kiri atas
 x2_frame, y2_frame = 1400, 850  # Pojok kanan bawah
 
 # Garis Start dan End
-line_crossing = 400
-line_x_start, line_x_end = 80,1100
+line_crossing = 800
+line_x_start, line_x_end = 20,1900
 
 # Pelacakan objek
 object_count_car = 0
@@ -57,26 +45,13 @@ car_id = 0
 bus_id = 0
 truck_id = 0
 
-
-def inserData(object_name, x1,x2 ):
-
-    W_pixel = x2 -x1
-    l_meter = (W_pixel * 10) / 1000
-
-    sql = """
-    INSERT INTO result (object_name, long_pixel, long_meter) 
-    VALUES (%s , %s, %s)
-    """
-    val = (object_name, W_pixel,l_meter)
-    mycursor.execute(sql,val)
-    mydb.commit()
-
 # Fungsi untuk memeriksa apakah bounding box melintasi garis
 def is_crossing_line(box):
     x1,y1,x2,y2 = box
     box_center_y = (y1 + y2) / 2
     box_center_x = (x1 + x2) / 2
-    if box_center_y >= line_crossing and box_center_y <= (line_crossing + 2) and box_center_x >= line_x_start and box_center_x <= (line_x_end) :
+
+    if line_crossing - 3 <= box_center_y <= line_crossing + 3 and line_x_start <= box_center_x <= line_x_end:
         return True
     return False 
 
@@ -96,7 +71,7 @@ while ret:
         x1, y1, x2, y2, score, class_id = result
         
         # Deteksi on ROI (Region of Interest)
-        if score > threshold and str(results.names[class_id]) != "person" and str(results.names[class_id]) != "bicycle":
+        if score > threshold and str(results.names[class_id]) in filter_object:
             
             if is_crossing_line([x1,y1,x2,y2]):
                 if str(results.names[class_id]) == "car":
@@ -119,9 +94,9 @@ while ret:
             cv2.putText(frame, str(results.names[class_id]).upper() + " " + str(round(score, 2)), (int(x1), int(y1 - 10)),
                         cv2.FONT_HERSHEY_SIMPLEX, 1.3, (0, 255, 0), 3, cv2.LINE_AA)
             
-            cv2.putText(frame, "cars : " + str(object_count_car), (960,440), cv2.FONT_HERSHEY_SIMPLEX, 1.3, (255, 0, 0), 3, cv2.LINE_AA)
-            cv2.putText(frame, "bus : " + str(object_count_bus), (960,490), cv2.FONT_HERSHEY_SIMPLEX, 1.3, (255, 0, 0), 3, cv2.LINE_AA)
-            cv2.putText(frame, "truck : " + str(object_count_truck), (960,580), cv2.FONT_HERSHEY_SIMPLEX, 1.3, (255, 0, 0), 3, cv2.LINE_AA)
+            cv2.putText(frame, "cars : " + str(object_count_car), (50,80), cv2.FONT_HERSHEY_SIMPLEX, 1.3, (255, 0, 0), 3, cv2.LINE_AA)
+            cv2.putText(frame, "bus : " + str(object_count_bus), (50,130), cv2.FONT_HERSHEY_SIMPLEX, 1.3, (255, 0, 0), 3, cv2.LINE_AA)
+            cv2.putText(frame, "truck : " + str(object_count_truck), (50,180), cv2.FONT_HERSHEY_SIMPLEX, 1.3, (255, 0, 0), 3, cv2.LINE_AA)
                     
 
     # resize image

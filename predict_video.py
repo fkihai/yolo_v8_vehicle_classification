@@ -9,8 +9,7 @@ cap = cv2.VideoCapture(video_path)
 ret, frame = cap.read()
 H, W, _ = frame.shape
 
-# model_path = os.path.join('.', 'runs', 'detect', 'train8', 'weights', 'best.pt')
-model_path = os.path.join('.', 'model/yolov8n.pt')
+model_path = os.path.join('.', 'yolov8m.pt')
 
 # Load the model
 model = YOLO(model_path)  # Load a custom YOLO model
@@ -19,15 +18,6 @@ threshold = 0.50
 
 width = 1280   # Lebar frame 
 height = 720   # Tinggi frame 
-
-x1_frame, y1_frame = 80, 400  # Pojok kiri atas
-x2_frame, y2_frame = 1600, 1000  # Pojok kanan bawah
-
-def calculateBox(x1, y1, x2, y2):
-    width = int(x2 - x1)
-    height = int(y2 - y1)
-    area = width * height
-    return area
 
 while ret:
     # Run inference on the frame
@@ -44,6 +34,7 @@ while ret:
 
     # resize image
     frame = cv2.resize(frame, (width, height))
+    
     # Display the frame with detections
     cv2.imshow('YOLO Object Detection', frame)
 

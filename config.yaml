@@ -1,4 +1,4 @@
-path : C:\Users\msila\Documents\project\yolo_v8_custom_model\data
+path : C:/Users/msila/Documents/project/yolo_v8_custom_model/data
 train : train/images
 val : valid/images
 test: test/images
