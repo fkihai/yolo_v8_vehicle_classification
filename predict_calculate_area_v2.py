@@ -25,8 +25,9 @@ mydb = mysql.connector.connect(
 )
 mycursor = mydb.cursor()
 
-# model_path = os.path.join('.', 'runs', 'detect', 'train', 'weights', 'best.pt')
-model_path = os.path.join('.', 'yolov8m.pt')
+# Model Yolo
+# doc : https://docs.ultralytics.com/models
+model_path = os.path.join('.', 'yolov5nu.pt')
 
 # Load the model
 model = YOLO(model_path)  # Load a custom YOLO model
@@ -45,24 +46,26 @@ line_crossing_y = 640
 line_crossing_x_start, line_crossing_x_end = 160,1090
 
 # object detection
-filter_object = ['car', 'bus', 'bicycle','truck']
+filter_object = ['car', 'bus', 'bicycle','truck','motorbike']
+filter_ids = [2, 5, 1, 7, 3]
 
 # millis update object calculate
 interval = 100
 previous_time = int(round(time.time() * 1000))
 
 # conting
-object_conting = 0
+object_counting = 0
+classification = ""
 
 # ever detect
-vehicle_centroids = []
+vehicle_detect = []
 
 def vehicle_car_classification(centimer):
     if centimer <= 500:
         return "IV B"
-    elif 500 < centimer <= 700:
+    elif 500 < centimer <= 770:
         return "V B"
-    elif 700 < centimer <= 1000:
+    elif 770 < centimer <= 1000:
         return "VI B"
     elif 1000 < centimer <= 1200:
         return "VII B"
@@ -76,6 +79,7 @@ def calculate_bounding_box_width(x1, x2):
     return width
 
 def pixel_to_centimeters(pixel_width):
+    # 358 pixel  = 7.4 meter -> calibration
     centimeter = pixel_width * 2.067
     return centimeter;
 
@@ -104,6 +108,9 @@ def is_similiar_object(new_centroid,existing_centroid,max_distance=20):
             return True
     return False 
 
+# RTSP stream sebagai input
+# stream_url = "rtsp://username:password@192.168.1.100:554/stream"
+
 while ret:
 
     # hitung fps
@@ -114,8 +121,15 @@ while ret:
         frame_counter = 0
         start_time = time.time()
 
-    # Run inference on the frame
-    results = model(frame)[0]
+    results = results = model.track(
+        source=frame,       
+        persist=True,             
+        conf=0.5,                
+        device="0",               
+        save=False,               
+        classes=filter_ids,            
+        show=False                
+    )  
     
     # Buat Area Garis Merah
     cv2.rectangle(frame, (int(x1_frame), int(y1_frame)), (int(x2_frame), int(y2_frame)), (0, 255, 0), 4)
@@ -123,35 +137,50 @@ while ret:
     # Buat garis hitung
     cv2.line(frame, (line_crossing_x_start, line_crossing_y), (line_crossing_x_end, line_crossing_y), (255, 0, 0), 4)
 
-    # Draw bounding boxes and labels for detections
-    for result in results.boxes.data.tolist():
-        x1, y1, x2, y2, score, class_id = result
-        
-        # Deteksi on ROI (Region of Interest)
-        if x1_frame <= x1 <= x2_frame and y1_frame <= y1 <= y2_frame:
-            # filter object detection
-            if score > threshold and results.names[int(class_id)] in filter_object:
-                current_time = int(round(time.time() * 1000))
-                if current_time - previous_time >= interval:
-                    previous_time = current_time
-                    if is_crossing_line(y2) :
-                        object_conting += 1
-                        pixel_width = calculate_bounding_box_width(x1,x2)
-                        centimeter = pixel_to_centimeters(pixel_width)
-                        classification = vehicle_car_classification(centimeter)
-                        inserData(results.names[int(class_id)],pixel_width,centimeter,classification)
 
-                cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 4)
-                cv2.putText(frame, results.names[int(class_id)].upper() + " " + str(calculate_bounding_box_width(x1,x2)), (int(x1), int(y1 - 10)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.3, (0, 255, 0), 3, cv2.LINE_AA)
-    
+    # Draw bounding boxes and labels for detections
+    for result in results:
+        try:
+            for box in result.boxes:
+                try:
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])  # Bounding box coordinates
+                    id = int(box.id)  # ID unik dari pelacakan
+                    cls = result.names[int(box.cls)]  # Nama kelas objek
+                    conf = float(box.conf)  # Confidence score
+
+                    # Deteksi on ROI (Region of Interest)
+                    if x1_frame <= x1 <= x2_frame and y1_frame <= y1 <= y2_frame:
+                        try:
+                            if is_crossing_line(y2) and id not in vehicle_detect:
+                                object_counting += 1
+                                vehicle_detect.append(id)
+                                pixel_width = calculate_bounding_box_width(x1, x2)
+                                centimeter = pixel_to_centimeters(pixel_width)
+                                classification = vehicle_car_classification(centimeter)
+                                inserData(cls, pixel_width, centimeter, classification)
+                        except Exception as e:
+                            print(f"Error during vehicle detection: {e}")
+
+                        # Visualisasi bounding box dan label
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                        cv2.putText(frame, f"{cls} ID:{id} Conf:{conf:.2f}", (x1, y1 - 10),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                except Exception as e:
+                    print(f"Error processing bounding box: {e}")
+        except Exception as e:
+            print(f"Error processing result: {e}")
+
 
     # print counter
-    cv2.putText(frame, f"counting : {object_conting}", (900, 50),
-                cv2.FONT_HERSHEY_SIMPLEX, 1.3, (0, 255, 0), 3, cv2.LINE_AA)
+    cv2.putText(frame, f"Count : {object_counting}", (900, 50),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3, cv2.LINE_AA)
+    cv2.putText(frame, f"Class : {classification}", (900, 100),
+            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3, cv2.LINE_AA)
+    
     # Menampilkan FPS pada frame
-    cv2.putText(frame, f"FPS: {fps:.2f}", (900, 100),
-                cv2.FONT_HERSHEY_SIMPLEX, 1.3, (0, 255, 0), 3, cv2.LINE_AA)
+    cv2.putText(frame, f"FPS : {fps:.2f}", (900, 150),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3, cv2.LINE_AA)
+
 
     # resize image
     frame = cv2.resize(frame, (width, height))
