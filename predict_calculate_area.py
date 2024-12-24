@@ -58,15 +58,15 @@ object_conting = 0
 vehicle_centroids = []
 
 def vehicle_car_classification(centimer):
-    if centimer <= 500:
+    if centimer <= 600:
         return "IV B"
-    elif 500 < centimer <= 700:
+    elif 600 < centimer <= 800:
         return "V B"
-    elif 700 < centimer <= 1000:
+    elif 800 < centimer <= 1100:
         return "VI B"
-    elif 1000 < centimer <= 1200:
+    elif 1100 < centimer <= 1300:
         return "VII B"
-    elif 1200 < centimer <= 1600:
+    elif 1300 < centimer <= 1700:
         return "VIII B"
     else:
         return "IX B"

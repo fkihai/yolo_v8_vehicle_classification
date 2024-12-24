@@ -46,37 +46,40 @@ x1_frame, y1_frame = 150, 180  # Pojok kiri atas
 x2_frame, y2_frame = 1100, 650  # Pojok kanan bawah
 
 # Batas Garis Hitung 
-line_crossing_y = 640
-line_crossing_x_start, line_crossing_x_end = 160,1090
+start_line_crossing_y = 540
+end_line_crossing_y = 640
+
+start_line_crossing_x1, start_line_crossing_x2 = 160,1090
+end_line_crossing_x1, end_line_crossing_x2 = 160,1090
+
+# bool hitung
+cross_start = False
 
 # object detection
 filter_object = ['car', 'bus', 'bicycle','truck','motorbike']
 filter_ids = [2, 5, 1, 7, 3]
 
-# millis update object calculate
-interval = 100
-previous_time = int(round(time.time() * 1000))
-
 # conting
 object_counting = 0
 classification = ""
+centimeter = 0
 
-# ever detect
-vehicle_detect = []
-
-def vehicle_car_classification(centimer):
-    if centimer <= 600:
-        return "IV B"
-    elif 600 < centimer <= 800:
-        return "V B"
-    elif 800 < centimer <= 1100:
-        return "VI B"
-    elif 1100 < centimer <= 1300:
-        return "VII B"
-    elif 1300 < centimer <= 1700:
-        return "VIII B"
-    else:
-        return "IX B"
+def vehicle_car_classification(classification,centimer):
+    if classification != "motorcycle" and classification != "bicycle":
+        if centimer <= 600:
+            return "IV B"
+        elif 600 < centimer <= 800:
+            return "V B"
+        elif 800 < centimer <= 1100:
+            return "VI B"
+        elif 1100 < centimer <= 1300:
+            return "VII B"
+        elif 1300 < centimer <= 1700:
+            return "VIII B"
+        else:
+            return "IX B"
+    elif classification == "motorcycle" : return "II B"
+    elif classification == "bicycle" : return "I B"
 
 def calculate_bounding_box_width(x1, x2):
     width = int(x2 - x1)
@@ -97,20 +100,16 @@ def inserData(name, pixel, centimeter, classification ):
     mydb.commit()
 
 # Fungsi untuk memeriksa apakah bounding box melintasi garis
-def is_crossing_line(y2):
-    if line_crossing_y - 5 <= y2 <= line_crossing_y + 5:
+def is_start_crossing_line(y2):
+    if start_line_crossing_y - 5 <= y2 <= start_line_crossing_y + 5:
         return True
     return False
 
-def calculate_centroid(x1,y1,x2,y2):
-    return ((x1 + x2) // 2,(y1 + y1) // 2)
+def is_end_crossing_line(y2):
+    if end_line_crossing_y - 5 <= y2 <= end_line_crossing_y + 5:
+        return True
+    return False
 
-def is_similiar_object(new_centroid,existing_centroid,max_distance=20):
-    for centroid in existing_centroid:
-        distance = ((new_centroid[0] - centroid[0])**2 + (new_centroid[1]-centroid[1])**2)
-        if distance < max_distance :
-            return True
-    return False 
 
 # RTSP stream sebagai input
 # stream_url = "rtsp://username:password@192.168.1.100:554/stream"
@@ -136,11 +135,12 @@ while ret:
         stream=True               
     )  
     
-    # Buat Area Garis Merah
+    # Buat Area deteksi
     cv2.rectangle(frame, (int(x1_frame), int(y1_frame)), (int(x2_frame), int(y2_frame)), (0, 255, 0), 4)
 
     # Buat garis hitung
-    cv2.line(frame, (line_crossing_x_start, line_crossing_y), (line_crossing_x_end, line_crossing_y), (255, 0, 0), 4)
+    cv2.line(frame, (start_line_crossing_x1, start_line_crossing_y), (start_line_crossing_x2, start_line_crossing_y), (0, 0, 255), 4)
+    cv2.line(frame, (end_line_crossing_x1, end_line_crossing_y), (end_line_crossing_x2, end_line_crossing_y), (255, 0, 0), 4)
 
 
     # Draw bounding boxes and labels for detections
@@ -156,13 +156,15 @@ while ret:
                     # Deteksi on ROI (Region of Interest)
                     if x1_frame <= x1 <= x2_frame and y1_frame <= y1 <= y2_frame:
                         try:
-                            if is_crossing_line(y2) and id not in vehicle_detect:
+                            if is_start_crossing_line(y2) : cross_start = True
+                            if cross_start and is_end_crossing_line(y2) :
+                                cross_start = False
                                 object_counting += 1
-                                vehicle_detect.append(id)
                                 pixel_width = calculate_bounding_box_width(x1, x2)
                                 centimeter = pixel_to_centimeters(pixel_width)
-                                classification = vehicle_car_classification(centimeter)
+                                classification = vehicle_car_classification(cls,centimeter)
                                 inserData(cls, pixel_width, centimeter, classification)
+
                         except Exception as e:
                             print(f"Error during vehicle detection: {e}")
 
@@ -175,7 +177,6 @@ while ret:
         except Exception as e:
             print(f"Error processing result: {e}")
 
-
     # print counter
     cv2.putText(frame, f"Count : {object_counting}", (900, 50),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3, cv2.LINE_AA)
@@ -183,7 +184,7 @@ while ret:
             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3, cv2.LINE_AA)
     
     # Menampilkan FPS pada frame
-    cv2.putText(frame, f"FPS : {fps:.2f}", (900, 150),
+    cv2.putText(frame, f"meter : {centimeter/100:.2f}", (900, 150),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3, cv2.LINE_AA)
 
 
