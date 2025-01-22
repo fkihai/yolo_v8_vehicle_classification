@@ -1,4 +1,4 @@
-runs
+runs/
 *.pt
-videos
-images
+videos/
+images/

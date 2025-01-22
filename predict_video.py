@@ -3,10 +3,12 @@ from ultralytics import YOLO
 import cv2
 import time
 
+RTSP_URL = "rtsp://admin:admin@192.168.1.100:8554/Streaming/Channels/101"
+
 VIDEOS_DIR = os.path.join('.', 'videos')
 video_path = os.path.join(VIDEOS_DIR, 'truck-test.mp4')
 
-cap = cv2.VideoCapture(video_path)
+cap = cv2.VideoCapture(RTSP_URL)
 ret, frame = cap.read()
 H, W, _ = frame.shape
 
