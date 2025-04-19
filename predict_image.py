@@ -4,14 +4,14 @@ import cv2
 
 # Path ke gambar
 IMAGE_DIR = os.path.join('.','images')
-image_path = os.path.join(IMAGE_DIR, 'truck-tambang.jpg')
+image_path = os.path.join(IMAGE_DIR, 'car.jpg')
 
 # Validasi file gambar
 if not os.path.exists(image_path):
     raise FileNotFoundError(f"Image file not found at {image_path}")
 
 # Path ke model YOLO
-model_path = os.path.join('.','yolov8m.pt')
+model_path = os.path.join('.','yolov8n.pt')
 
 # Load model YOLO
 model = YOLO(model_path)

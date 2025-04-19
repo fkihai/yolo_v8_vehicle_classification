@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 3
+names: ["bicycle", "car", "truck"]
+
+roboflow:
+  workspace: klasifikasi-daun-cj9v2
+  project: vechile-bjp17
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/klasifikasi-daun-cj9v2/vechile-bjp17/dataset/1
