@@ -30,7 +30,7 @@ mycursor = mydb.cursor()
 
 # Model Yolo
 # doc : https://docs.ultralytics.com/models
-model_path = os.path.join('.', 'yolov8m.pt')
+model_path = os.path.join('.', 'yolov8n.pt')
 
 # Load the model
 model = YOLO(model_path)  # Load a custom YOLO model
@@ -38,8 +38,11 @@ threshold = 0.60
 
 
 # convert ke settingan 1280 x 720
-cap_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-cap_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+cap_height = int(frame.shape[0])
+cap_width = int(frame.shape[1])
+
+# cap_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+# cap_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
 mutliple_width = int(cap_width / 1280)
 mutliple_height = int(cap_height / 720)
@@ -209,4 +212,3 @@ while ret:
 
 cap.release()
 cv2.destroyAllWindows()
-
