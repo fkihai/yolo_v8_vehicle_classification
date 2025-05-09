@@ -1,16 +1,26 @@
+# FIKSS
+
 import os
 from ultralytics import YOLO
 import cv2
 import time
 import mysql.connector
 
-RTSP_URL = "rtsp://admin:admin@192.168.1.100:8554/Streaming/Channels/101"
+RTSP_URL = "rtsp://admin:admin@192.168.0.100:8554/Streaming/Channels/101"
 
-VIDEOS_DIR = os.path.join('.', 'videos')
+VIDEOS_DIR = os.path.join('videos')
 VIDEO_PATH = os.path.join(VIDEOS_DIR, 'truck-test.mp4')
 
 cap = cv2.VideoCapture(VIDEO_PATH)
+
+if not cap.isOpened():
+    print(f"Error: Gagal membuka video di path {VIDEO_PATH}")
+    exit()
+
 ret, frame = cap.read()
+if not ret or frame is None:
+    print("Error: Gagal membaca frame dari video.")
+    exit()
 
 H, W, _ = frame.shape
 
@@ -30,7 +40,7 @@ mycursor = mydb.cursor()
 
 # Model Yolo
 # doc : https://docs.ultralytics.com/models
-model_path = os.path.join('.', 'yolov8n.pt')
+model_path = os.path.join('.', 'yolov8m.pt')
 
 # Load the model
 model = YOLO(model_path)  # Load a custom YOLO model
@@ -38,11 +48,8 @@ threshold = 0.60
 
 
 # convert ke settingan 1280 x 720
-cap_height = int(frame.shape[0])
-cap_width = int(frame.shape[1])
-
-# cap_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-# cap_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+cap_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+cap_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
 mutliple_width = int(cap_width / 1280)
 mutliple_height = int(cap_height / 720)
@@ -54,15 +61,15 @@ height = 720
 
 
 # ROI
-x1_frame, y1_frame = 150 * mutliple_width, 180 * mutliple_height  # Pojok kiri atas
-x2_frame, y2_frame = 1100 * mutliple_width, 650 * mutliple_height  # Pojok kanan bawah
+x1_frame, y1_frame = 190 * mutliple_width, 180 * mutliple_height  # Pojok kiri atas
+x2_frame, y2_frame = 1300 * mutliple_width, 650 * mutliple_height  # Pojok kanan bawah
 
 # Batas Garis Hitung 
 start_line_crossing_y = 540 * mutliple_height
 end_line_crossing_y = 640 * mutliple_height
 
-start_line_crossing_x1, start_line_crossing_x2 = 160 * mutliple_width,1090 * mutliple_width
-end_line_crossing_x1, end_line_crossing_x2 = 160 * mutliple_width, 1090 * mutliple_width
+start_line_crossing_x1, start_line_crossing_x2 = 200 * mutliple_width,1290 * mutliple_width
+end_line_crossing_x1, end_line_crossing_x2 = 200 * mutliple_width, 1290 * mutliple_width
 
 # bool hitung
 cross_start = False
@@ -74,40 +81,48 @@ filter_ids = [2, 5, 1, 7, 3]
 # conting
 object_counting = 0
 classification = ""
-centimeter = 0
+
+height_cm = 0
+length_cm = 0
 
 def vehicle_car_classification(classification,centimer):
     if classification != "motorcycle" and classification != "bicycle":
-        if centimer <= 600:
+        if centimer <= 500:
             return "IV B"
-        elif 600 < centimer <= 800:
+        elif 500 < centimer <= 700:
             return "V B"
-        elif 800 < centimer <= 1100:
+        elif 700 < centimer <= 1000:
             return "VI B"
-        elif 1100 < centimer <= 1300:
+        elif 1000 < centimer <= 1200:
             return "VII B"
-        elif 1300 < centimer <= 1700:
+        elif 1200 < centimer <= 1600:
             return "VIII B"
         else:
             return "IX B"
     elif classification == "motorcycle" : return "II B"
     elif classification == "bicycle" : return "I B"
 
-def calculate_bounding_box_width(x1, x2):
-    width = int(x2 - x1)
-    return width
 
-def pixel_to_centimeters(pixel_width):
-    # 358 pixel  = 7.4 meter -> calibration
-    centimeter = pixel_width * 2.067
+def calculate_bounding_box_length(value1, value2):
+    result = int(value2 - value1)
+    return result
+
+def pixel_length_to_centimeters(pixel_width):
+    # 353 pixel  = 5.9 meter -> calibration -> 590 cm / 353 -> 1.671
+    centimeter = pixel_width * 1.671
     return centimeter;
 
-def inserData(name, pixel, centimeter, classification ):
+def pixel_height_to_centimeters(pixel_height):
+    # 390 pixel  = 2.5 meter -> calibration -> 250 cm / 390 - > 0.641
+    centimeter = pixel_width * 0.641
+    return centimeter;
+
+def inserData(name, height_pixel, widht_pixel, height_cm, width_cm, classification ):
     sql = """
-    INSERT INTO result (name, long_pixel, long_cm, classification) 
-    VALUES (%s , %s, %s, %s)
+    INSERT INTO result (name, height_pixel, width_pixel, height_cm, width_cm, classification) 
+    VALUES (%s, %s, %s, %s, %s, %s)
     """
-    val = (name, pixel, centimeter,classification)
+    val = (name, widht_pixel, height_pixel,height_cm, width_cm, classification)
     mycursor.execute(sql,val)
     mydb.commit()
 
@@ -121,7 +136,6 @@ def is_end_crossing_line(y2):
     if end_line_crossing_y - 5 <= y2 <= end_line_crossing_y + 5:
         return True
     return False
-
 
 # RTSP stream sebagai input
 # stream_url = "rtsp://username:password@192.168.1.100:554/stream"
@@ -172,10 +186,15 @@ while ret:
                             if cross_start and is_end_crossing_line(y2) :
                                 cross_start = False
                                 object_counting += 1
-                                pixel_width = calculate_bounding_box_width(x1, x2)
-                                centimeter = pixel_to_centimeters(pixel_width)
-                                classification = vehicle_car_classification(cls,centimeter)
-                                inserData(cls, pixel_width, centimeter, classification)
+
+                                pixel_height = calculate_bounding_box_length(y1, y2)
+                                pixel_width = calculate_bounding_box_length(x1, x2)
+                                
+                                height_cm = pixel_height_to_centimeters(pixel_height)
+                                length_cm = pixel_length_to_centimeters(pixel_width)
+
+                                classification = vehicle_car_classification(cls,length_cm)
+                                inserData(cls, pixel_height, pixel_width, height_cm, length_cm, classification)
 
                         except Exception as e:
                             print(f"Error during vehicle detection: {e}")
@@ -190,13 +209,14 @@ while ret:
             print(f"Error processing result: {e}")
 
 
-    cv2.putText(frame, f"Count : {object_counting}", (900 * mutliple_width, 50),
-                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3, cv2.LINE_AA)
-    cv2.putText(frame, f"Class : {classification}", (900 * mutliple_width, 100),
-            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3, cv2.LINE_AA)
-    cv2.putText(frame, f"meter : {centimeter/100:.2f}", (900 * mutliple_width, 150),
-                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3, cv2.LINE_AA)
-
+    cv2.putText(frame, f"Count : {object_counting}", (900 * mutliple_width, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
+    cv2.putText(frame, f"Class : {classification}", (900 * mutliple_width, 60),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
+    cv2.putText(frame, f"Height (m) : {height_cm/100:.2f}", (900 * mutliple_width, 90),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
+    cv2.putText(frame, f"Length (m) : {length_cm/100:.2f}", (900 * mutliple_width, 120),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
     # resize image
     frame = cv2.resize(frame, (width, height)
                        )
